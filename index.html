@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dulce Benjamín - Catálogo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+const PRODUCTOS_DEMO = [
+  { id:1, categoria:'Chocolates', nombre:'Bombón surtido', precio:500, imagen:'https://via.placeholder.com/200' },
+  { id:2, categoria:'Chocolates', nombre:'Trufas x10', precio:1200, imagen:'https://via.placeholder.com/200' },
+  { id:3, categoria:'Caramelos', nombre:'Caramelos ácidos x50', precio:800, imagen:'https://via.placeholder.com/200' },
+  { id:4, categoria:'Chupetines', nombre:'Chupetín gigante', precio:300, imagen:'https://via.placeholder.com/200' },
+  { id:5, categoria:'Combos', nombre:'Combo cumple x20', precio:5000, imagen:'https://via.placeholder.com/200' },
+];
+
+const CATEGORIAS = ['Todos','Chocolates','Caramelos','Chupetines','Combos'];
+
+function App(){
+  const [categoria, setCategoria] = useState('Todos');
+  const [carrito, setCarrito] = useState([]);
+  const [mostrarCarrito, setMostrarCarrito] = useState(false);
+
+  const productosFiltrados = categoria==='Todos' ? PRODUCTOS_DEMO : PRODUCTOS_DEMO.filter(p=>p.categoria===categoria);
+
+  function agregarAlCarrito(producto){
+    setCarrito(prev=>{
+      const existe = prev.find(i=>i.id===producto.id);
+      if(existe) return prev.map(i=>i.id===producto.id?{...i,cantidad:i.cantidad+1}:i);
+      return [...prev, {...producto, cantidad:1}];
+    });
+  }
+
+  function cambiarCantidad(id, delta){
+    setCarrito(prev=>prev.map(i=>i.id===id?{...i,cantidad:i.cantidad+delta}:i).filter(i=>i.cantidad>0));
+  }
+
+  function quitarDelCarrito(id){
+    setCarrito(prev=>prev.filter(i=>i.id!==id));
+  }
+
+  const total = carrito.reduce((acc,i)=>acc+i.precio*i.cantidad,0);
+  const cantidadTotal = carrito.reduce((a,i)=>a+i.cantidad,0);
+
+  return (
+    <div className="min-h-screen bg-pink-50">
+      <header className="flex justify-between items-center p-4 bg-white shadow sticky top-0 z-10">
+        <h1 className="text-xl md:text-2xl font-bold text-pink-600">Dulce Benjamín</h1>
+        <div className="flex gap-3 items-center">
+          <a href="https://wa.me/549XXXXXXXXXX" target="_blank" className="text-2xl">🟢</a>
+          <a href="https://instagram.com/TU_USUARIO" target="_blank" className="text-2xl">📷</a>
+          <button onClick={()=>setMostrarCarrito(true)} className="relative bg-pink-500 text-white px-3 py-2 rounded-full">
+            🛒
+            {cantidadTotal>0 && <span className="absolute -top-2 -right-2 bg-red-500 text-xs rounded-full w-5 h-5 flex items-center justify-center">{cantidadTotal}</span>}
+          </button>
+        </div>
+      </header>
+
+      <nav className="flex gap-2 overflow-x-auto p-3">
+        {CATEGORIAS.map(cat=>(
+          <button key={cat} onClick={()=>setCategoria(cat)}
+            className={`px-4 py-2 rounded-full whitespace-nowrap text-sm ${categoria===cat?'bg-pink-500 text-white':'bg-white text-gray-700'}`}>
+            {cat}
+          </button>
+        ))}
+      </nav>
+
+      <main className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+        {productosFiltrados.map(p=>(
+          <div key={p.id} className="bg-white rounded-lg shadow p-3">
+            <img src={p.imagen} className="w-full h-32 object-cover rounded"/>
+            <h3 className="font-semibold mt-2 text-sm">{p.nombre}</h3>
+            <p className="text-pink-600 font-bold">${p.precio}</p>
+            <button onClick={()=>agregarAlCarrito(p)} className="mt-2 w-full bg-pink-500 text-white py-1 rounded text-sm">Agregar</button>
+          </div>
+        ))}
+      </main>
+
+      {mostrarCarrito && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-20" onClick={()=>setMostrarCarrito(false)}>
+          <div className="bg-white w-80 max-w-full h-full p-4 overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Presupuesto</h2>
+              <button onClick={()=>setMostrarCarrito(false)}>✕</button>
+            </div>
+            {carrito.length===0 ? <p className="text-gray-500">Carrito vacío</p> : carrito.map(i=>(
+              <div key={i.id} className="flex justify-between items-center mb-3 border-b pb-2">
+                <div>
+                  <p className="font-semibold text-sm">{i.nombre}</p>
+                  <p className="text-xs text-gray-500">${i.precio} c/u</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={()=>cambiarCantidad(i.id,-1)} className="w-6 h-6 bg-gray-200 rounded">-</button>
+                  <span>{i.cantidad}</span>
+                  <button onClick={()=>cambiarCantidad(i.id,1)} className="w-6 h-6 bg-gray-200 rounded">+</button>
+                  <button onClick={()=>quitarDelCarrito(i.id)} className="text-red-500 ml-2">🗑</button>
+                </div>
+              </div>
+            ))}
+            <div className="mt-4 font-bold text-lg flex justify-between">
+              <span>Total:</span><span>${total}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
