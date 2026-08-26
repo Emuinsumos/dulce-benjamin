@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dulce Benjamín - Catálogo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBd4mcfZH98-unKXxUKj81jnl8NK0QrDaE",
+    authDomain: "dulce-benjamin.firebaseapp.com",
+    databaseURL: "https://dulce-benjamin-default-rtdb.firebaseio.com",
+    projectId: "dulce-benjamin",
+    storageBucket: "dulce-benjamin.firebasestorage.app",
+    messagingSenderId: "5815785466",
+    appId: "1:5815785466:web:9745df4db2740e865d3643"
+  };
+  firebase.initializeApp(firebaseConfig);
+  window.db = firebase.database();
+</script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function resizeImagen(file, callback){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 500;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function App(){
+  const [productos, setProductos] = useState({});
+  const [categorias, setCategorias] = useState([]);
+  const [config, setConfig] = useState({whatsapp:'', instagram:''});
+  const [categoria, setCategoria] = useState('Todos');
+  const [carrito, setCarrito] = useState([]);
+  const [mostrarCarrito, setMostrarCarrito] = useState(false);
+
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [mostrarLogin, setMostrarLogin] = useState(false);
+  const [mostrarAdmin, setMostrarAdmin] = useState(false);
+  const [usuario, setUsuario] = useState('');
+  const [contrasena, setContrasena] = useState('');
+  const [errorLogin, setErrorLogin] = useState('');
+
+  const [form, setForm] = useState({nombre:'', categoria:'', precio:'', imagen:''});
+  const [editandoId, setEditandoId] = useState(null);
+  const [nuevaCategoria, setNuevaCategoria] = useState('');
+  const [whatsappInput, setWhatsappInput] = useState('');
+  const [instagramInput, setInstagramInput] = useState('');
+
+  useEffect(() => {
+    db.ref('productos').on('value', snap => setProductos(snap.val() || {}));
+    db.ref('categorias').on('value', snap => setCategorias(snap.val() || []));
+    db.ref('config').on('value', snap => {
+      const c = snap.val() || {whatsapp:'', instagram:''};
+      setConfig(c);
+      setWhatsappInput(c.whatsapp || '');
+      setInstagramInput(c.instagram || '');
+    });
+  }, []);
+
+  const listaProductos = Object.entries(productos).map(([id, p]) => ({id, ...p}));
+  const productosFiltrados = categoria === 'Todos' ? listaProductos : listaProductos.filter(p => p.categoria === categoria);
+
+  function agregarAlCarrito(producto){
+    setCarrito(prev => {
+      const existe = prev.find(i => i.id === producto.id);
+      if(existe) return prev.map(i => i.id === producto.id ? {...i, cantidad: i.cantidad+1} : i);
+      return [...prev, {...producto, cantidad: 1}];
+    });
+  }
+  function cambiarCantidad(id, delta){
+    setCarrito(prev => prev.map(i => i.id===id ? {...i, cantidad: i.cantidad+delta} : i).filter(i => i.cantidad>0));
+  }
+  function quitarDelCarrito(id){
+    setCarrito(prev => prev.filter(i => i.id !== id));
+  }
+  const total = carrito.reduce((acc,i)=>acc+i.precio*i.cantidad,0);
+  const cantidadTotal = carrito.reduce((a,i)=>a+i.cantidad,0);
+
+  function intentarLogin(){
+    if(usuario === 'Micaela' && contrasena === 'pablo'){
+      setLoggedIn(true);
+      setMostrarLogin(false);
+      setErrorLogin('');
+      setUsuario(''); setContrasena('');
+    } else {
+      setErrorLogin('Usuario o contraseña incorrectos');
+    }
+  }
+  function cerrarSesion(){
+    setLoggedIn(false);
+    setMostrarAdmin(false);
+  }
+
+  function editarProducto(p){
+    setForm({nombre: p.nombre, categoria: p.categoria, precio: p.precio, imagen: p.imagen});
+    setEditandoId(p.id);
+  }
+  function resetForm(){
+    setForm({nombre:'', categoria:'', precio:'', imagen:''});
+    setEditandoId(null);
+  }
+  function guardarProducto(){
+    if(!form.nombre || !form.categoria || !form.precio) return;
+    const id = editandoId || db.ref('productos').push().key;
+    db.ref('productos/'+id).set({
+      nombre: form.nombre,
+      categoria: form.categoria,
+      precio: Number(form.precio),
+      imagen: form.imagen || ''
+    });
+    resetForm();
+  }
+  function eliminarProducto(id){
+    db.ref('productos/'+id).remove();
+  }
+  function handleImagen(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    resizeImagen(file, (dataUrl) => setForm(f => ({...f, imagen: dataUrl})));
+  }
+
+  function agregarCategoria(){
+    if(!nuevaCategoria || categorias.includes(nuevaCategoria)) return;
+    db.ref('categorias').set([...categorias, nuevaCategoria]);
+    setNuevaCategoria('');
+  }
+  function eliminarCategoria(cat){
+    db.ref('categorias').set(categorias.filter(c => c !== cat));
+  }
+
+  function guardarConfig(){
+    db.ref('config').set({whatsapp: whatsappInput, instagram: instagramInput});
+  }
+
+  return (
+    <div className="min-h-screen bg-pink-50">
+      <header className="flex justify-between items-center p-4 bg-white shadow sticky top-0 z-10">
+        <h1 className="text-xl md:text-2xl font-bold text-pink-600">Dulce Benjamín</h1>
+        <div className="flex gap-3 items-center">
+          {config.whatsapp && <a href={"https://wa.me/"+config.whatsapp} target="_blank" className="text-2xl">🟢</a>}
+          {config.instagram && <a href={"https://instagram.com/"+config.instagram} target="_blank" className="text-2xl">📷</a>}
+          <button onClick={()=>setMostrarCarrito(true)} className="relative bg-pink-500 text-white px-3 py-2 rounded-full">
+            🛒
+            {cantidadTotal>0 && <span className="absolute -top-2 -right-2 bg-red-500 text-xs rounded-full w-5 h-5 flex items-center justify-center">{cantidadTotal}</span>}
+          </button>
+          {!loggedIn ? (
+            <button onClick={()=>setMostrarLogin(true)} className="text-2xl" title="Admin">🔒</button>
+          ) : (
+            <button onClick={()=>setMostrarAdmin(true)} className="text-2xl" title="Panel admin">⚙️</button>
+          )}
+        </div>
+      </header>
+
+      <nav className="flex gap-2 overflow-x-auto p-3">
+        {['Todos', ...categorias].map(cat=>(
+          <button key={cat} onClick={()=>setCategoria(cat)}
+            className={`px-4 py-2 rounded-full whitespace-nowrap text-sm ${categoria===cat?'bg-pink-500 text-white':'bg-white text-gray-700'}`}>
+            {cat}
+          </button>
+        ))}
+      </nav>
+
+      <main className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+        {productosFiltrados.length===0 && <p className="col-span-full text-center text-gray-400 py-10">Todavía no hay productos cargados en esta categoría.</p>}
+        {productosFiltrados.map(p=>(
+          <div key={p.id} className="bg-white rounded-lg shadow p-3">
+            <img src={p.imagen || 'https://via.placeholder.com/200'} className="w-full h-32 object-cover rounded"/>
+            <h3 className="font-semibold mt-2 text-sm">{p.nombre}</h3>
+            <p className="text-pink-600 font-bold">${p.precio}</p>
+            <button onClick={()=>agregarAlCarrito(p)} className="mt-2 w-full bg-pink-500 text-white py-1 rounded text-sm">Agregar</button>
+          </div>
+        ))}
+      </main>
+
+      {mostrarCarrito && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-20" onClick={()=>setMostrarCarrito(false)}>
+          <div className="bg-white w-80 max-w-full h-full p-4 overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Presupuesto</h2>
+              <button onClick={()=>setMostrarCarrito(false)}>✕</button>
+            </div>
+            {carrito.length===0 ? <p className="text-gray-500">Carrito vacío</p> : carrito.map(i=>(
+              <div key={i.id} className="flex justify-between items-center mb-3 border-b pb-2">
+                <div>
+                  <p className="font-semibold text-sm">{i.nombre}</p>
+                  <p className="text-xs text-gray-500">${i.precio} c/u</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={()=>cambiarCantidad(i.id,-1)} className="w-6 h-6 bg-gray-200 rounded">-</button>
+                  <span>{i.cantidad}</span>
+                  <button onClick={()=>cambiarCantidad(i.id,1)} className="w-6 h-6 bg-gray-200 rounded">+</button>
+                  <button onClick={()=>quitarDelCarrito(i.id)} className="text-red-500 ml-2">🗑</button>
+                </div>
+              </div>
+            ))}
+            <div className="mt-4 font-bold text-lg flex justify-between">
+              <span>Total:</span><span>${total}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarLogin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30" onClick={()=>setMostrarLogin(false)}>
+          <div className="bg-white rounded-lg p-6 w-72" onClick={e=>e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">Ingreso admin</h2>
+            <input value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Usuario" className="border rounded w-full p-2 mb-2"/>
+            <input value={contrasena} onChange={e=>setContrasena(e.target.value)} type="password" placeholder="Contraseña" className="border rounded w-full p-2 mb-2"/>
+            {errorLogin && <p className="text-red-500 text-sm mb-2">{errorLogin}</p>}
+            <button onClick={intentarLogin} className="w-full bg-pink-500 text-white py-2 rounded">Ingresar</button>
+          </div>
+        </div>
+      )}
+
+      {mostrarAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-30" onClick={()=>setMostrarAdmin(false)}>
+          <div className="bg-white w-full max-w-md h-full p-4 overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Panel admin</h2>
+              <div className="flex gap-3">
+                <button onClick={cerrarSesion} className="text-sm text-red-500">Cerrar sesión</button>
+                <button onClick={()=>setMostrarAdmin(false)}>✕</button>
+              </div>
+            </div>
+
+            <h3 className="font-bold mb-2">{editandoId ? 'Editar producto' : 'Nuevo producto'}</h3>
+            <input value={form.nombre} onChange={e=>setForm({...form, nombre:e.target.value})} placeholder="Nombre" className="border rounded w-full p-2 mb-2"/>
+            <select value={form.categoria} onChange={e=>setForm({...form, categoria:e.target.value})} className="border rounded w-full p-2 mb-2">
+              <option value="">Elegir categoría</option>
+              {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input value={form.precio} onChange={e=>setForm({...form, precio:e.target.value})} type="number" placeholder="Precio" className="border rounded w-full p-2 mb-2"/>
+            <input type="file" accept="image/*" onChange={handleImagen} className="w-full mb-2"/>
+            {form.imagen && <img src={form.imagen} className="w-24 h-24 object-cover rounded mb-2"/>}
+            <div className="flex gap-2 mb-6">
+              <button onClick={guardarProducto} className="flex-1 bg-pink-500 text-white py-2 rounded">{editandoId ? 'Guardar cambios' : 'Agregar producto'}</button>
+              {editandoId && <button onClick={resetForm} className="px-4 bg-gray-200 rounded">Cancelar</button>}
+            </div>
+
+            <h3 className="font-bold mb-2">Productos cargados</h3>
+            {listaProductos.map(p => (
+              <div key={p.id} className="flex justify-between items-center border-b py-2">
+                <span className="text-sm">{p.nombre} ({p.categoria}) - ${p.precio}</span>
+                <div className="flex gap-2">
+                  <button onClick={()=>editarProducto(p)} className="text-blue-500 text-sm">Editar</button>
+                  <button onClick={()=>eliminarProducto(p.id)} className="text-red-500 text-sm">Borrar</button>
+                </div>
+              </div>
+            ))}
+
+            <h3 className="font-bold mt-6 mb-2">Categorías</h3>
+            <div className="flex gap-2 mb-2">
+              <input value={nuevaCategoria} onChange={e=>setNuevaCategoria(e.target.value)} placeholder="Nueva categoría" className="border rounded flex-1 p-2"/>
+              <button onClick={agregarCategoria} className="bg-pink-500 text-white px-3 rounded">Agregar</button>
+            </div>
+            {categorias.map(c => (
+              <div key={c} className="flex justify-between items-center border-b py-1">
+                <span className="text-sm">{c}</span>
+                <button onClick={()=>eliminarCategoria(c)} className="text-red-500 text-sm">Borrar</button>
+              </div>
+            ))}
+
+            <h3 className="font-bold mt-6 mb-2">Redes sociales</h3>
+            <label className="text-xs text-gray-500">WhatsApp (solo número, ej: 5491122334455)</label>
+            <input value={whatsappInput} onChange={e=>setWhatsappInput(e.target.value)} placeholder="5491122334455" className="border rounded w-full p-2 mb-2"/>
+            <label className="text-xs text-gray-500">Usuario de Instagram (sin @)</label>
+            <input value={instagramInput} onChange={e=>setInstagramInput(e.target.value)} placeholder="dulcebenjamin" className="border rounded w-full p-2 mb-2"/>
+            <button onClick={guardarConfig} className="w-full bg-pink-500 text-white py-2 rounded mt-2">Guardar redes</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
