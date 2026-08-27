@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dulce Benjamín Candy Bar</title>
+<meta name="description" content="Cajitas 3D, candy bar y combos dulces personalizados para cumpleaños, casamientos y eventos.">
+<meta property="og:title" content="Dulce Benjamín Candy Bar">
+<meta property="og:description" content="Cajitas 3D, candy bar y combos dulces personalizados para tu evento.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F8C8DC">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%AC%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBd4mcfZH98-unKXxUKj81jnl8NK0QrDaE",
+    authDomain: "dulce-benjamin.firebaseapp.com",
+    databaseURL: "https://dulce-benjamin-default-rtdb.firebaseio.com",
+    projectId: "dulce-benjamin",
+    storageBucket: "dulce-benjamin.firebasestorage.app",
+    messagingSenderId: "5815785466",
+    appId: "1:5815785466:web:9745df4db2740e865d3643"
+  };
+  firebase.initializeApp(firebaseConfig);
+  window.db = firebase.database();
+</script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const NOMBRE_NEGOCIO = "Dulce Benjamín";
+
+function resizeImagen(file, callback, maxW){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const ancho = maxW || 500;
+      const scale = Math.min(1, ancho / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function imagenesDe(p){
+  if(p.imagenes && p.imagenes.length) return p.imagenes;
+  if(p.imagen) return [p.imagen];
+  return [];
+}
+function variantesDe(p){
+  if(p.variantes && p.variantes.length) return p.variantes;
+  if(p.precio) return [{cantidad:1, precio:p.precio}];
+  return [];
+}
+function pagadoDe(pedido){
+  return Object.values(pedido.pagos||{}).reduce((a,p)=>a+p.monto,0);
+}
+function debeDe(pedido){
+  return pedido.total - pagadoDe(pedido);
+}
+function fechaCorta(ts){
+  return new Date(ts).toLocaleDateString('es-AR');
+}
+
+function App(){
+  const [productos, setProductos] = useState({});
+  const [categorias, setCategorias] = useState([]);
+  const [config, setConfig] = useState({whatsapp:'', instagram:'', logo:''});
+  const [pedidos, setPedidos] = useState({});
+  const [clientes, setClientes] = useState({});
+  const [categoria, setCategoria] = useState('Todos');
+  const [busqueda, setBusqueda] = useState('');
+  const [carrito, setCarrito] = useState([]);
+  const [mostrarCarrito, setMostrarCarrito] = useState(false);
+  const [productoVisto, setProductoVisto] = useState(null);
+  const [indiceImagen, setIndiceImagen] = useState(0);
+  const abrioCompartidoRef = useRef(false);
+
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [mostrarLogin, setMostrarLogin] = useState(false);
+  const [mostrarAdmin, setMostrarAdmin] = useState(false);
+  const [adminTab, setAdminTab] = useState('tablero');
+  const [usuario, setUsuario] = useState('');
+  const [contrasena, setContrasena] = useState('');
+  const [errorLogin, setErrorLogin] = useState('');
+
+  const [form, setForm] = useState({nombre:'', categoria:'', descripcion:'', imagenes:[], agotado:false, variantes:[{cantidad:'1', precio:''}]});
+  const [editandoId, setEditandoId] = useState(null);
+  const [nuevaCategoria, setNuevaCategoria] = useState('');
+  const [whatsappInput, setWhatsappInput] = useState('');
+  const [instagramInput, setInstagramInput] = useState('');
+
+  const [datosPedido, setDatosPedido] = useState({nombre:'', telefono:'', zona:'', fecha:''});
+  const [pedidoEnviado, setPedidoEnviado] = useState(false);
+  const [montoPagoInputs, setMontoPagoInputs] = useState({});
+
+  const [presClienteNombre, setPresClienteNombre] = useState('');
+  const [presClienteTelefono, setPresClienteTelefono] = useState('');
+  const [presItems, setPresItems] = useState([]);
+  const [presProductoId, setPresProductoId] = useState('');
+  const [presVarianteIdx, setPresVarianteIdx] = useState(0);
+  const [presCantidad, setPresCantidad] = useState('1');
+  const [presOtroNombre, setPresOtroNombre] = useState('');
+  const [presOtroPrecio, setPresOtroPrecio] = useState('');
+
+  const [aumentoPorcentaje, setAumentoPorcentaje] = useState('');
+  const [aumentoRedondeo, setAumentoRedondeo] = useState('1000');
+
+  const [mostrarPresupuestoPublico, setMostrarPresupuestoPublico] = useState(false);
+  const [pubProductoId, setPubProductoId] = useState('');
+  const [pubVarianteIdx, setPubVarianteIdx] = useState(0);
+  const [pubCantidad, setPubCantidad] = useState('1');
+  const [pubItems, setPubItems] = useState([]);
+
+  useEffect(() => {
+    db.ref('productos').on('value', snap => setProductos(snap.val() || {}));
+    db.ref('categorias').on('value', snap => setCategorias(snap.val() || []));
+    db.ref('pedidos').on('value', snap => setPedidos(snap.val() || {}));
+    db.ref('clientes').on('value', snap => setClientes(snap.val() || {}));
+    db.ref('config').on('value', snap => {
+      const c = snap.val() || {whatsapp:'', instagram:'', logo:''};
+      setConfig(c);
+      setWhatsappInput(c.whatsapp || '');
+      setInstagramInput(c.instagram || '');
+    });
+  }, []);
+
+  useEffect(() => {
+    const pedidosRef = db.ref('pedidos');
+    let idsIniciales = new Set();
+    let listo = false;
+    pedidosRef.once('value').then(snap => {
+      if(snap.exists()) idsIniciales = new Set(Object.keys(snap.val()));
+      listo = true;
+    });
+    const handler = snap => {
+      if(!listo) return;
+      if(!idsIniciales.has(snap.key)){
+        idsIniciales.add(snap.key);
+        if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+          const v = snap.val();
+          new Notification('Nuevo pedido en Dulce Benjamín', {body: `${v.nombre} - $${v.total}`});
+        }
+      }
+    };
+    pedidosRef.on('child_added', handler);
+    return () => pedidosRef.off('child_added', handler);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('producto');
+    if(id && productos[id] && !abrioCompartidoRef.current){
+      abrioCompartidoRef.current = true;
+      setProductoVisto({id, ...productos[id]});
+      setIndiceImagen(0);
+    }
+  }, [productos]);
+
+  const listaProductos = Object.entries(productos).map(([id, p]) => ({id, ...p}));
+  const productosFiltrados = listaProductos
+    .filter(p => categoria === 'Todos' || p.categoria === categoria)
+    .filter(p => !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+  const listaPedidos = Object.entries(pedidos).map(([id, p]) => ({id, ...p})).sort((a,b)=>(b.creado||0)-(a.creado||0));
+  const listaClientes = Object.entries(clientes).map(([id, c]) => ({id, ...c}));
+  const pedidosPendientes = listaPedidos.filter(p => p.estado === 'recibido').length;
+
+  function agregarAlCarrito(producto, variante){
+    const cartId = producto.id + '-' + variante.cantidad;
+    setCarrito(prev => {
+      const existe = prev.find(i => i.cartId === cartId);
+      if(existe) return prev.map(i => i.cartId===cartId ? {...i, unidades: i.unidades+1} : i);
+      return [...prev, {cartId, productoId: producto.id, nombre: producto.nombre, cantidadPack: variante.cantidad, precioPack: variante.precio, unidades: 1}];
+    });
+  }
+  function cambiarUnidades(cartId, delta){
+    setCarrito(prev => prev.map(i => i.cartId===cartId ? {...i, unidades: i.unidades+delta} : i).filter(i => i.unidades>0));
+  }
+  function quitarDelCarrito(cartId){
+    setCarrito(prev => prev.filter(i => i.cartId !== cartId));
+  }
+  const total = carrito.reduce((acc,i)=>acc+i.precioPack*i.unidades,0);
+  const cantidadTotal = carrito.reduce((a,i)=>a+i.unidades,0);
+
+  function abrirProducto(p){
+    setProductoVisto(p);
+    setIndiceImagen(0);
+  }
+
+  function compartirProducto(p){
+    const url = window.location.origin + window.location.pathname + '?producto=' + p.id;
+    if(navigator.share){
+      navigator.share({title: p.nombre, text: p.descripcion || 'Mirá este producto de Dulce Benjamín', url}).catch(()=>{});
+    } else if(navigator.clipboard){
+      navigator.clipboard.writeText(url);
+      alert('Link copiado, ya lo podés pegar donde quieras');
+    }
+  }
+
+  function pedirNotificaciones(){
+    if(typeof Notification !== 'undefined') Notification.requestPermission();
+  }
+
+  function enviarPedido(){
+    if(!datosPedido.nombre || !datosPedido.telefono || !datosPedido.zona || !datosPedido.fecha) return;
+    if(carrito.length===0) return;
+    db.ref('pedidos').push().set({
+      items: carrito,
+      total,
+      nombre: datosPedido.nombre,
+      telefono: datosPedido.telefono,
+      zona: datosPedido.zona,
+      fecha: datosPedido.fecha,
+      estado: 'recibido',
+      creado: Date.now()
+    });
+
+    if(config.whatsapp){
+      const lineas = ['Hola! Quiero hacer un pedido:'];
+      carrito.forEach(i => lineas.push(`- ${i.unidades} x (${i.nombre} - pack de ${i.cantidadPack}) = $${i.precioPack*i.unidades}`));
+      lineas.push(`Total: $${total}`);
+      lineas.push(`Nombre: ${datosPedido.nombre}`);
+      lineas.push(`Teléfono: ${datosPedido.telefono}`);
+      lineas.push(`Zona: ${datosPedido.zona}`);
+      lineas.push(`Fecha del evento: ${datosPedido.fecha}`);
+      const mensaje = encodeURIComponent(lineas.join('\n'));
+      window.open(`https://wa.me/${config.whatsapp}?text=${mensaje}`, '_blank');
+    }
+
+    setPedidoEnviado(true);
+    setCarrito([]);
+    setDatosPedido({nombre:'', telefono:'', zona:'', fecha:''});
+    setTimeout(()=>{ setPedidoEnviado(false); setMostrarCarrito(false); }, 2500);
+  }
+
+  function cambiarEstadoPedido(id, estado){
+    db.ref('pedidos/'+id+'/estado').set(estado);
+  }
+
+  function registrarPago(pedido){
+    const monto = Number(montoPagoInputs[pedido.id]);
+    if(!monto || monto<=0) return;
+    db.ref('pedidos/'+pedido.id+'/pagos').push().set({monto, fecha: Date.now()});
+    setMontoPagoInputs(prev => ({...prev, [pedido.id]: ''}));
+  }
+
+  function generarRecibo(pedido, pago){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.setTextColor(219,39,119);
+    doc.text(NOMBRE_NEGOCIO, 14, 20);
+    doc.setFontSize(14);
+    doc.setTextColor(80,80,80);
+    doc.text('Recibo de pago', 14, 32);
+    doc.setFontSize(11);
+    doc.text(`Cliente: ${pedido.nombre}`, 14, 44);
+    doc.text(`Fecha de pago: ${fechaCorta(pago.fecha)}`, 14, 51);
+    doc.text(`Monto pagado: $${pago.monto}`, 14, 58);
+    doc.text(`Total del pedido: $${pedido.total}`, 14, 65);
+    doc.text(`Saldo restante: $${debeDe(pedido)}`, 14, 72);
+    doc.save(`recibo-${pedido.nombre.replace(/\s+/g,'_')}-${fechaCorta(pago.fecha).replace(/\//g,'-')}.pdf`);
+  }
+
+  function intentarLogin(){
+    if(usuario === 'Micaela' && contrasena === 'pablo'){
+      setLoggedIn(true);
+      setMostrarLogin(false);
+      setErrorLogin('');
+      setUsuario(''); setContrasena('');
+    } else {
+      setErrorLogin('Usuario o contraseña incorrectos');
+    }
+  }
+  function cerrarSesion(){
+    setLoggedIn(false);
+    setMostrarAdmin(false);
+  }
+
+  function editarProducto(p){
+    setForm({
+      nombre: p.nombre,
+      categoria: p.categoria,
+      descripcion: p.descripcion || '',
+      imagenes: imagenesDe(p),
+      agotado: !!p.agotado,
+      variantes: variantesDe(p).map(v=>({cantidad:String(v.cantidad), precio:String(v.precio)}))
+    });
+    setEditandoId(p.id);
+    setAdminTab('productos');
+  }
+  function resetForm(){
+    setForm({nombre:'', categoria:'', descripcion:'', imagenes:[], agotado:false, variantes:[{cantidad:'1', precio:''}]});
+    setEditandoId(null);
+  }
+  function guardarProducto(){
+    const variantesValidas = form.variantes.filter(v=>v.cantidad && v.precio).map(v=>({cantidad:Number(v.cantidad), precio:Number(v.precio)}));
+    if(!form.nombre || !form.categoria || variantesValidas.length===0) return;
+    const id = editandoId || db.ref('productos').push().key;
+    db.ref('productos/'+id).set({
+      nombre: form.nombre,
+      categoria: form.categoria,
+      descripcion: form.descripcion || '',
+      imagenes: form.imagenes,
+      agotado: form.agotado,
+      variantes: variantesValidas
+    });
+    resetForm();
+  }
+  function eliminarProducto(id){
+    db.ref('productos/'+id).remove();
+  }
+  function handleImagenes(e){
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      resizeImagen(file, (dataUrl) => setForm(f => ({...f, imagenes: [...f.imagenes, dataUrl]})));
+    });
+    e.target.value = '';
+  }
+  function quitarImagenForm(idx){
+    setForm(f => ({...f, imagenes: f.imagenes.filter((_,i)=>i!==idx)}));
+  }
+  function cambiarVariante(idx, campo, valor){
+    setForm(f => ({...f, variantes: f.variantes.map((v,i)=> i===idx ? {...v, [campo]: valor} : v)}));
+  }
+  function agregarFilaVariante(){
+    setForm(f => ({...f, variantes: [...f.variantes, {cantidad:'', precio:''}]}));
+  }
+  function quitarFilaVariante(idx){
+    setForm(f => ({...f, variantes: f.variantes.filter((_,i)=>i!==idx)}));
+  }
+
+  function agregarCategoria(){
+    if(!nuevaCategoria || categorias.includes(nuevaCategoria)) return;
+    db.ref('categorias').set([...categorias, nuevaCategoria]);
+    setNuevaCategoria('');
+  }
+  function eliminarCategoria(cat){
+    db.ref('categorias').set(categorias.filter(c => c !== cat));
+  }
+
+  function guardarConfig(){
+    db.ref('config').set({...config, whatsapp: whatsappInput, instagram: instagramInput});
+  }
+  function handleLogo(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    resizeImagen(file, (dataUrl) => {
+      db.ref('config').set({...config, whatsapp: whatsappInput, instagram: instagramInput, logo: dataUrl});
+    }, 300);
+  }
+
+  function aplicarAumento(){
+    const pct = Number(aumentoPorcentaje);
+    const redondeo = Number(aumentoRedondeo);
+    if(!pct || !redondeo) return;
+    if(!window.confirm(`¿Aumentar todos los precios un ${pct}% redondeando a $${redondeo}? No se puede deshacer.`)) return;
+    const actualizados = {};
+    Object.entries(productos).forEach(([id,p]) => {
+      const nuevasVariantes = variantesDe(p).map(v => {
+        const nuevo = v.precio * (1 + pct/100);
+        return {cantidad: v.cantidad, precio: Math.round(nuevo/redondeo)*redondeo};
+      });
+      actualizados[id] = {...p, variantes: nuevasVariantes};
+    });
+    db.ref('productos').set(actualizados);
+    setAumentoPorcentaje('');
+  }
+
+  function guardarClienteNuevo(){
+    if(!presClienteNombre) return;
+    const yaExiste = listaClientes.find(c => c.nombre.toLowerCase()===presClienteNombre.toLowerCase());
+    if(yaExiste) return;
+    db.ref('clientes').push().set({nombre: presClienteNombre, telefono: presClienteTelefono});
+  }
+  function elegirClienteExistente(id){
+    if(!id) { setPresClienteNombre(''); setPresClienteTelefono(''); return; }
+    const c = clientes[id];
+    setPresClienteNombre(c.nombre);
+    setPresClienteTelefono(c.telefono || '');
+  }
+  function agregarItemPresupuesto(){
+    if(!presProductoId) return;
+    const p = productos[presProductoId];
+    const variante = variantesDe(p)[presVarianteIdx];
+    const cant = Number(presCantidad) || 1;
+    setPresItems(prev => [...prev, {nombre: `${p.nombre} (pack ${variante.cantidad})`, cantidad: cant, precio: variante.precio}]);
+    setPresCantidad('1');
+  }
+  function agregarItemLibre(){
+    if(!presOtroNombre || !presOtroPrecio) return;
+    setPresItems(prev => [...prev, {nombre: presOtroNombre, cantidad: 1, precio: Number(presOtroPrecio)}]);
+    setPresOtroNombre(''); setPresOtroPrecio('');
+  }
+  function quitarItemPresupuesto(idx){
+    setPresItems(prev => prev.filter((_,i)=>i!==idx));
+  }
+  const totalPresupuesto = presItems.reduce((a,it)=>a+it.cantidad*it.precio,0);
+
+  function generarPresupuestoPDF(){
+    if(!presClienteNombre || presItems.length===0) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    if(config.logo){
+      try{
+        const fmt = config.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(config.logo, fmt, 160, 10, 35, 35);
+      }catch(e){}
+    }
+    doc.setFontSize(20);
+    doc.setTextColor(219,39,119);
+    doc.text(NOMBRE_NEGOCIO, 14, 20);
+    doc.setFontSize(11);
+    doc.setTextColor(90,90,90);
+    doc.text(`Presupuesto para: ${presClienteNombre}`, 14, 32);
+    if(presClienteTelefono) doc.text(`Teléfono: ${presClienteTelefono}`, 14, 38);
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-AR')}`, 14, 44);
+
+    const filas = presItems.map(it => [it.nombre, String(it.cantidad), `$${it.precio}`, `$${it.cantidad*it.precio}`]);
+    doc.autoTable({
+      head: [['Producto','Cantidad','Precio unit.','Subtotal']],
+      body: filas,
+      startY: 52,
+      theme: 'grid',
+      headStyles: {fillColor:[244,114,182]}
+    });
+
+    doc.setFontSize(14);
+    doc.setTextColor(219,39,119);
+    doc.text(`Total: $${totalPresupuesto}`, 14, doc.lastAutoTable.finalY + 12);
+    doc.setFontSize(10);
+    doc.setTextColor(150,150,150);
+    doc.text('¡Gracias por elegirnos! Cualquier consulta, escribinos.', 14, doc.lastAutoTable.finalY + 22);
+
+    doc.save(`presupuesto-${presClienteNombre.replace(/\s+/g,'_')}.pdf`);
+  }
+
+  function agregarItemPublico(){
+    if(!pubProductoId) return;
+    const p = productos[pubProductoId];
+    const variante = variantesDe(p)[pubVarianteIdx];
+    const cant = Number(pubCantidad) || 1;
+    setPubItems(prev => [...prev, {nombre: `${p.nombre} (pack ${variante.cantidad})`, cantidad: cant, precio: variante.precio}]);
+    setPubCantidad('1');
+  }
+  function quitarItemPublico(idx){
+    setPubItems(prev => prev.filter((_,i)=>i!==idx));
+  }
+  const pubTotal = pubItems.reduce((a,it)=>a+it.cantidad*it.precio,0);
+  function enviarPresupuestoPublicoWhatsapp(){
+    const lineas = ['Hola! Armé este presupuesto en la página:'];
+    pubItems.forEach(it => lineas.push(`- ${it.cantidad}x ${it.nombre} = $${it.cantidad*it.precio}`));
+    lineas.push(`Total estimado: $${pubTotal}`);
+    lineas.push('(No incluye envío, precios sujetos a confirmación)');
+    const mensaje = encodeURIComponent(lineas.join('\n'));
+    window.open(`https://wa.me/${config.whatsapp}?text=${mensaje}`, '_blank');
+  }
+
+  const ESTADOS = [
+    {key:'recibido', label:'Recibido', color:'bg-yellow-400'},
+    {key:'en_proceso', label:'En proceso', color:'bg-blue-400'},
+    {key:'entregado', label:'Entregado', color:'bg-green-500'},
+    {key:'rechazado', label:'Rechazado', color:'bg-red-500'}
+  ];
+
+  const ahora = new Date();
+  // el dashboard solo cuenta pedidos confirmados: "recibido" todavía puede no concretarse
+  // y "rechazado" no debe sumar ingresos.
+  const pedidosConfirmados = listaPedidos.filter(p => p.estado==='en_proceso' || p.estado==='entregado');
+  const pedidosDelMes = pedidosConfirmados.filter(p => {
+    const d = new Date(p.creado||0);
+    return d.getMonth()===ahora.getMonth() && d.getFullYear()===ahora.getFullYear();
+  });
+  const totalVendidoMes = pedidosDelMes.reduce((a,p)=>a+p.total,0);
+  const totalCobradoGlobal = pedidosConfirmados.reduce((a,p)=>a+pagadoDe(p),0);
+  const totalPendienteGlobal = pedidosConfirmados.reduce((a,p)=>a+Math.max(debeDe(p),0),0);
+  const rankingProductos = (() => {
+    const conteo = {};
+    pedidosConfirmados.forEach(p => (p.items||[]).forEach(it => { conteo[it.nombre] = (conteo[it.nombre]||0) + it.unidades; }));
+    return Object.entries(conteo).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  })();
+  const maxRanking = rankingProductos.length ? rankingProductos[0][1] : 1;
+
+  return (
+    <div className="min-h-screen bg-pink-50">
+      <header className="flex justify-between items-center p-4 bg-white shadow sticky top-0 z-10 flex-wrap gap-2">
+        <h1 className="text-xl md:text-2xl font-bold text-pink-600">Dulce Benjamín</h1>
+        <div className="flex gap-2 items-center flex-wrap">
+          {config.whatsapp && (
+            <a href={"https://wa.me/"+config.whatsapp} target="_blank"
+               className="rounded-full bg-green-500 text-white text-xs md:text-sm font-bold px-3 py-2 shadow-md hover:shadow-lg transition-all flex items-center gap-1">
+              💬 Mándame tu mensaje
+            </a>
+          )}
+          {config.instagram && (
+            <a href={"https://instagram.com/"+config.instagram} target="_blank"
+               className="rounded-full bg-purple-500 text-white text-xs md:text-sm font-bold px-3 py-2 shadow-md hover:shadow-lg transition-all flex items-center gap-1">
+              📷 Seguime en Instagram
+            </a>
+          )}
+          <button onClick={()=>setMostrarPresupuestoPublico(true)}
+            className="rounded-full bg-pink-500 text-white text-xs md:text-sm font-bold px-3 py-2 shadow-md hover:shadow-lg transition-all">
+            🎀 Armá tu presupuesto acá
+          </button>
+          <button onClick={()=>setMostrarCarrito(true)} className="relative bg-pink-500 text-white px-3 py-2 rounded-full">
+            🛒
+            {cantidadTotal>0 && <span className="absolute -top-2 -right-2 bg-red-500 text-xs rounded-full w-5 h-5 flex items-center justify-center">{cantidadTotal}</span>}
+          </button>
+          {!loggedIn ? (
+            <button onClick={()=>setMostrarLogin(true)} className="text-2xl" title="Admin">🔒</button>
+          ) : (
+            <button onClick={()=>setMostrarAdmin(true)} className="relative text-2xl" title="Panel admin">
+              ⚙️
+              {pedidosPendientes>0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{pedidosPendientes}</span>}
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div className="p-3 pb-0">
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar producto..." className="border rounded-full w-full p-2 px-4 text-sm"/>
+      </div>
+
+      <nav className="flex gap-2 overflow-x-auto p-3">
+        {['Todos', ...categorias].map(cat=>(
+          <button key={cat} onClick={()=>setCategoria(cat)}
+            className={`px-4 py-2 rounded-full whitespace-nowrap text-sm ${categoria===cat?'bg-pink-500 text-white':'bg-white text-gray-700'}`}>
+            {cat}
+          </button>
+        ))}
+      </nav>
+
+      <main className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+        {productosFiltrados.length===0 && <p className="col-span-full text-center text-gray-400 py-10">No se encontraron productos.</p>}
+        {productosFiltrados.map(p=>{
+          const imgs = imagenesDe(p);
+          const variantes = variantesDe(p);
+          const precios = variantes.map(v=>v.precio);
+          const precioTexto = precios.length>1 ? `Desde $${Math.min(...precios)}` : `$${precios[0] || 0}`;
+          return (
+            <div key={p.id} className="bg-white rounded-lg shadow p-3 relative">
+              <div className="relative">
+                <img src={imgs[0] || 'https://via.placeholder.com/200'} className={`w-full h-32 object-cover rounded ${p.agotado ? 'grayscale opacity-60' : ''}`}/>
+                {p.agotado && <span className="absolute top-1 left-1 bg-gray-700 text-white text-xs px-2 py-1 rounded-full">Agotado</span>}
+                <button onClick={()=>abrirProducto(p)}
+                  className="absolute -bottom-2 -right-2 bg-pink-500 text-white w-8 h-8 rounded-full shadow-md hover:shadow-lg transition-all font-bold">+</button>
+              </div>
+              <h3 className="font-semibold mt-2 text-sm">{p.nombre}</h3>
+              <p className="text-pink-600 font-bold">{precioTexto}</p>
+              <button disabled={p.agotado} onClick={()=>agregarAlCarrito(p, variantes[0])}
+                className={`mt-2 w-full py-1 rounded text-sm ${p.agotado ? 'bg-gray-300 text-gray-500' : 'bg-pink-500 text-white'}`}>
+                {p.agotado ? 'Agotado' : 'Agregar'}
+              </button>
+            </div>
+          );
+        })}
+      </main>
+
+      {productoVisto && (() => {
+        const imgs = imagenesDe(productoVisto);
+        const variantes = variantesDe(productoVisto);
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-40 p-4" onClick={()=>setProductoVisto(null)}>
+            <div className="bg-white rounded-lg max-w-md w-full overflow-y-auto max-h-full" onClick={e=>e.stopPropagation()}>
+              <div className="relative">
+                <img src={imgs[indiceImagen] || 'https://via.placeholder.com/400'} className={`w-full h-64 object-cover ${productoVisto.agotado ? 'grayscale opacity-60' : ''}`}/>
+                <button onClick={()=>setProductoVisto(null)} className="absolute top-2 right-2 bg-white/80 rounded-full w-8 h-8">✕</button>
+                <button onClick={()=>compartirProducto(productoVisto)} className="absolute top-2 left-2 bg-white/80 rounded-full w-8 h-8">🔗</button>
+                {productoVisto.agotado && <span className="absolute bottom-2 left-2 bg-gray-700 text-white text-xs px-2 py-1 rounded-full">Agotado</span>}
+                {imgs.length>1 && (
+                  <>
+                    <button onClick={()=>setIndiceImagen(i=>(i-1+imgs.length)%imgs.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full w-8 h-8">‹</button>
+                    <button onClick={()=>setIndiceImagen(i=>(i+1)%imgs.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full w-8 h-8">›</button>
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                      {imgs.map((_,i)=><span key={i} className={`w-2 h-2 rounded-full ${i===indiceImagen?'bg-pink-500':'bg-white/70'}`}></span>)}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="p-4">
+                <h3 className="font-bold text-lg">{productoVisto.nombre}</h3>
+                <p className="text-sm text-gray-600 mb-3">{productoVisto.descripcion || 'Sin descripción.'}</p>
+                <div className="space-y-2 mb-2">
+                  {variantes.map((v,idx)=>(
+                    <div key={idx} className="flex justify-between items-center border rounded-lg p-2">
+                      <span className="text-sm">{v.cantidad} unidad{v.cantidad>1?'es':''} — <b className="text-pink-600">${v.precio}</b></span>
+                      <button disabled={productoVisto.agotado} onClick={()=>agregarAlCarrito(productoVisto, v)}
+                        className={`px-3 py-1 rounded-full text-sm ${productoVisto.agotado ? 'bg-gray-300 text-gray-500' : 'bg-pink-500 text-white'}`}>
+                        Agregar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {mostrarCarrito && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-20" onClick={()=>setMostrarCarrito(false)}>
+          <div className="bg-white w-80 max-w-full h-full p-4 overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Presupuesto</h2>
+              <button onClick={()=>setMostrarCarrito(false)}>✕</button>
+            </div>
+
+            {pedidoEnviado ? (
+              <p className="text-green-600 font-bold text-center py-10">¡Pedido enviado! Te vamos a contactar pronto 🎉</p>
+            ) : (
+              <>
+                {carrito.length===0 ? <p className="text-gray-500">Carrito vacío</p> : carrito.map(i=>(
+                  <div key={i.cartId} className="flex justify-between items-center mb-3 border-b pb-2">
+                    <div>
+                      <p className="font-semibold text-sm">{i.nombre}</p>
+                      <p className="text-xs text-gray-500">pack de {i.cantidadPack} — ${i.precioPack} c/u pack</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={()=>cambiarUnidades(i.cartId,-1)} className="w-6 h-6 bg-gray-200 rounded">-</button>
+                      <span>{i.unidades}</span>
+                      <button onClick={()=>cambiarUnidades(i.cartId,1)} className="w-6 h-6 bg-gray-200 rounded">+</button>
+                      <button onClick={()=>quitarDelCarrito(i.cartId)} className="text-red-500 ml-2">🗑</button>
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-2 font-bold text-lg flex justify-between mb-4">
+                  <span>Total:</span><span>${total}</span>
+                </div>
+
+                {carrito.length>0 && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-bold mb-2">Completá tus datos para pedir</h3>
+                    <input value={datosPedido.nombre} onChange={e=>setDatosPedido({...datosPedido, nombre:e.target.value})} placeholder="Nombre" className="border rounded w-full p-2 mb-2"/>
+                    <input value={datosPedido.telefono} onChange={e=>setDatosPedido({...datosPedido, telefono:e.target.value})} placeholder="Teléfono" className="border rounded w-full p-2 mb-2"/>
+                    <input value={datosPedido.zona} onChange={e=>setDatosPedido({...datosPedido, zona:e.target.value})} placeholder="Zona" className="border rounded w-full p-2 mb-2"/>
+                    <label className="text-xs text-gray-500">Fecha del evento</label>
+                    <input value={datosPedido.fecha} onChange={e=>setDatosPedido({...datosPedido, fecha:e.target.value})} type="date" className="border rounded w-full p-2 mb-3"/>
+                    <button onClick={enviarPedido} className="w-full bg-pink-500 text-white py-2 rounded font-bold">Enviar pedido</button>
+                    <p className="text-xs text-gray-400 mt-2">Se va a abrir WhatsApp con el resumen para confirmar.</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mostrarPresupuestoPublico && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-25" onClick={()=>setMostrarPresupuestoPublico(false)}>
+          <div className="bg-white w-96 max-w-full h-full p-4 overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Armá tu presupuesto</h2>
+              <button onClick={()=>setMostrarPresupuestoPublico(false)}>✕</button>
+            </div>
+
+            <select value={pubProductoId} onChange={e=>{setPubProductoId(e.target.value); setPubVarianteIdx(0);}} className="border rounded w-full p-2 mb-2">
+              <option value="">Elegir producto</option>
+              {listaProductos.filter(p=>!p.agotado).map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+            {pubProductoId && (
+              <select value={pubVarianteIdx} onChange={e=>setPubVarianteIdx(Number(e.target.value))} className="border rounded w-full p-2 mb-2">
+                {variantesDe(productos[pubProductoId]).map((v,idx)=>(
+                  <option key={idx} value={idx}>{v.cantidad} unidad(es) — ${v.precio}</option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-2 mb-4">
+              <input value={pubCantidad} onChange={e=>setPubCantidad(e.target.value)} type="number" placeholder="Cantidad de packs" className="border rounded p-2 flex-1"/>
+              <button onClick={agregarItemPublico} className="bg-pink-500 text-white px-4 rounded">Agregar</button>
+            </div>
+
+            <h4 className="font-bold text-sm mb-2">Tu presupuesto</h4>
+            {pubItems.length===0 && <p className="text-gray-400 text-sm mb-2">Todavía no agregaste productos.</p>}
+            {pubItems.map((it,idx)=>(
+              <div key={idx} className="flex justify-between items-center border-b py-2 text-sm">
+                <span>{it.cantidad}x {it.nombre} — ${it.cantidad*it.precio}</span>
+                <button onClick={()=>quitarItemPublico(idx)} className="text-red-500">🗑</button>
+              </div>
+            ))}
+            <p className="font-bold text-lg text-right my-3">Total: ${pubTotal}</p>
+
+            {pubItems.length>0 && config.whatsapp && (
+              <button onClick={enviarPresupuestoPublicoWhatsapp}
+                className="w-full bg-green-500 text-white py-3 rounded-full font-bold shadow-md hover:shadow-lg transition-all mb-3">
+                💬 Mandar este presupuesto por WhatsApp
+              </button>
+            )}
+
+            <p className="text-xs text-gray-400 border-t pt-3">
+              No están incluidos los costos de envío, los precios pueden no estar actualizados. Mándanos tu pedido y nos contactamos con vos.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {mostrarLogin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30" onClick={()=>setMostrarLogin(false)}>
+          <div className="bg-white rounded-lg p-6 w-72" onClick={e=>e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">Ingreso admin</h2>
+            <input value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Usuario" className="border rounded w-full p-2 mb-2"/>
+            <input value={contrasena} onChange={e=>setContrasena(e.target.value)} type="password" placeholder="Contraseña" className="border rounded w-full p-2 mb-2"/>
+            {errorLogin && <p className="text-red-500 text-sm mb-2">{errorLogin}</p>}
+            <button onClick={intentarLogin} className="w-full bg-pink-500 text-white py-2 rounded">Ingresar</button>
+          </div>
+        </div>
+      )}
+
+      {mostrarAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-30" onClick={()=>setMostrarAdmin(false)}>
+          <div className="bg-white w-full max-w-md h-full p-4 overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Panel admin</h2>
+              <div className="flex gap-3">
+                <button onClick={cerrarSesion} className="text-sm text-red-500">Cerrar sesión</button>
+                <button onClick={()=>setMostrarAdmin(false)}>✕</button>
+              </div>
+            </div>
+
+            <button onClick={pedirNotificaciones} className="text-xs bg-gray-100 rounded-full px-3 py-2 mb-4">🔔 Activar notificaciones de pedidos</button>
+
+            <div className="flex gap-2 mb-4 overflow-x-auto">
+              {['tablero','productos','categorias','negocio','pedidos','presupuestos'].map(tab=>(
+                <button key={tab} onClick={()=>setAdminTab(tab)}
+                  className={`px-3 py-2 rounded-full text-sm whitespace-nowrap ${adminTab===tab?'bg-pink-500 text-white':'bg-gray-100'}`}>
+                  {tab==='tablero'?'📊 Tablero':tab==='productos'?'Productos':tab==='categorias'?'Categorías':tab==='negocio'?'Negocio':tab==='pedidos'?`Pedidos${pedidosPendientes>0?` (${pedidosPendientes})`:''}`:'Presupuestos'}
+                </button>
+              ))}
+            </div>
+
+            {adminTab==='tablero' && (
+              <div className="relative">
+                <div className="absolute -top-6 -left-6 w-32 h-32 bg-rosa bg-pink-200 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+                <div className="absolute top-20 -right-8 w-32 h-32 bg-purple-200 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+                <div className="relative grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-gradient-to-br from-pink-400 to-pink-200 rounded-2xl p-4 shadow-md text-white">
+                    <p className="text-xs opacity-90">Ventas del mes</p>
+                    <p className="text-2xl font-extrabold">${totalVendidoMes}</p>
+                    <p className="text-xs opacity-80">💰 {pedidosDelMes.length} pedidos</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-400 to-green-200 rounded-2xl p-4 shadow-md text-white">
+                    <p className="text-xs opacity-90">Cobrado (total)</p>
+                    <p className="text-2xl font-extrabold">${totalCobradoGlobal}</p>
+                    <p className="text-xs opacity-80">✅ acumulado</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-yellow-400 to-yellow-200 rounded-2xl p-4 shadow-md text-white col-span-2">
+                    <p className="text-xs opacity-90">Pendiente de cobro</p>
+                    <p className="text-2xl font-extrabold">${totalPendienteGlobal}</p>
+                    <p className="text-xs opacity-80">⏳ entre todos los pedidos</p>
+                  </div>
+                </div>
+
+                <div className="relative flex gap-2 mb-4">
+                  {ESTADOS.map(e=>(
+                    <div key={e.key} className={`flex-1 ${e.color} rounded-xl p-3 text-white text-center shadow`}>
+                      <p className="text-lg font-bold">{listaPedidos.filter(p=>p.estado===e.key).length}</p>
+                      <p className="text-xs">{e.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="relative bg-white rounded-2xl p-4 shadow-md">
+                  <h3 className="font-bold mb-3">🏆 Productos más pedidos</h3>
+                  {rankingProductos.length===0 && <p className="text-gray-400 text-sm">Todavía no hay datos suficientes.</p>}
+                  {rankingProductos.map(([nombre,cant],idx)=>(
+                    <div key={nombre} className="mb-2">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold">{nombre}</span>
+                        <span className="text-gray-500">{cant}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-3">
+                        <div className="bg-gradient-to-r from-purple-400 to-pink-400 h-3 rounded-full" style={{width: `${(cant/maxRanking)*100}%`}}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {adminTab==='productos' && (
+              <div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+                  <h3 className="font-bold text-sm mb-2">💲 Aumentar todos los precios</h3>
+                  <div className="flex gap-2 items-center mb-2">
+                    <input value={aumentoPorcentaje} onChange={e=>setAumentoPorcentaje(e.target.value)} type="number" placeholder="% de aumento" className="border rounded p-2 flex-1"/>
+                    <select value={aumentoRedondeo} onChange={e=>setAumentoRedondeo(e.target.value)} className="border rounded p-2">
+                      <option value="500">Redondear a $500</option>
+                      <option value="1000">Redondear a $1000</option>
+                    </select>
+                  </div>
+                  <button onClick={aplicarAumento} className="w-full bg-purple-500 text-white py-2 rounded font-bold text-sm">Aplicar a todos los productos</button>
+                </div>
+
+                <h3 className="font-bold mb-2">{editandoId ? 'Editar producto' : 'Nuevo producto'}</h3>
+                <input value={form.nombre} onChange={e=>setForm({...form, nombre:e.target.value})} placeholder="Nombre" className="border rounded w-full p-2 mb-2"/>
+                <select value={form.categoria} onChange={e=>setForm({...form, categoria:e.target.value})} className="border rounded w-full p-2 mb-2">
+                  <option value="">Elegir categoría</option>
+                  {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <textarea value={form.descripcion} onChange={e=>setForm({...form, descripcion:e.target.value})} placeholder="Descripción del producto" className="border rounded w-full p-2 mb-2" rows="3"></textarea>
+
+                <label className="text-xs text-gray-500">Cantidades y precios (ej: 1 unidad $1000, 10 unidades $30000)</label>
+                {form.variantes.map((v,idx)=>(
+                  <div key={idx} className="flex gap-2 mb-2 items-center">
+                    <input value={v.cantidad} onChange={e=>cambiarVariante(idx,'cantidad',e.target.value)} type="number" placeholder="Cant." className="border rounded p-2 w-20"/>
+                    <span className="text-sm">x $</span>
+                    <input value={v.precio} onChange={e=>cambiarVariante(idx,'precio',e.target.value)} type="number" placeholder="Precio" className="border rounded p-2 flex-1"/>
+                    {form.variantes.length>1 && <button onClick={()=>quitarFilaVariante(idx)} className="text-red-500">✕</button>}
+                  </div>
+                ))}
+                <button onClick={agregarFilaVariante} className="text-sm text-pink-600 mb-3">+ Agregar otra combinación</button>
+
+                <label className="flex items-center gap-2 mb-3">
+                  <input type="checkbox" checked={form.agotado} onChange={e=>setForm({...form, agotado:e.target.checked})}/>
+                  <span className="text-sm">Marcar como agotado</span>
+                </label>
+
+                <label className="text-xs text-gray-500">Fotos (podés elegir varias)</label>
+                <input type="file" accept="image/*" multiple onChange={handleImagenes} className="w-full mb-2"/>
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {form.imagenes.map((img,idx)=>(
+                    <div key={idx} className="relative">
+                      <img src={img} className="w-16 h-16 object-cover rounded"/>
+                      <button onClick={()=>quitarImagenForm(idx)} className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-xs">✕</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mb-6">
+                  <button onClick={guardarProducto} className="flex-1 bg-pink-500 text-white py-2 rounded">{editandoId ? 'Guardar cambios' : 'Agregar producto'}</button>
+                  {editandoId && <button onClick={resetForm} className="px-4 bg-gray-200 rounded">Cancelar</button>}
+                </div>
+
+                <h3 className="font-bold mb-2">Productos cargados</h3>
+                {listaProductos.map(p => (
+                  <div key={p.id} className="flex justify-between items-center border-b py-2">
+                    <span className="text-sm">{p.nombre} ({p.categoria}){p.agotado ? ' - Agotado' : ''}</span>
+                    <div className="flex gap-2">
+                      <button onClick={()=>editarProducto(p)} className="text-blue-500 text-sm">Editar</button>
+                      <button onClick={()=>eliminarProducto(p.id)} className="text-red-500 text-sm">Borrar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {adminTab==='categorias' && (
+              <div>
+                <h3 className="font-bold mb-2">Categorías</h3>
+                <div className="flex gap-2 mb-2">
+                  <input value={nuevaCategoria} onChange={e=>setNuevaCategoria(e.target.value)} placeholder="Nueva categoría" className="border rounded flex-1 p-2"/>
+                  <button onClick={agregarCategoria} className="bg-pink-500 text-white px-3 rounded">Agregar</button>
+                </div>
+                {categorias.map(c => (
+                  <div key={c} className="flex justify-between items-center border-b py-1">
+                    <span className="text-sm">{c}</span>
+                    <button onClick={()=>eliminarCategoria(c)} className="text-red-500 text-sm">Borrar</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {adminTab==='negocio' && (
+              <div>
+                <h3 className="font-bold mb-2">Logo (para los PDF de presupuesto)</h3>
+                {config.logo && <img src={config.logo} className="w-20 h-20 object-cover rounded mb-2 border"/>}
+                <input type="file" accept="image/*" onChange={handleLogo} className="w-full mb-4"/>
+
+                <h3 className="font-bold mb-2">Redes sociales</h3>
+                <label className="text-xs text-gray-500">WhatsApp (solo número, ej: 5491122334455)</label>
+                <input value={whatsappInput} onChange={e=>setWhatsappInput(e.target.value)} placeholder="5491122334455" className="border rounded w-full p-2 mb-2"/>
+                <label className="text-xs text-gray-500">Usuario de Instagram (sin @)</label>
+                <input value={instagramInput} onChange={e=>setInstagramInput(e.target.value)} placeholder="dulcebenjamin" className="border rounded w-full p-2 mb-2"/>
+                <button onClick={guardarConfig} className="w-full bg-pink-500 text-white py-2 rounded mt-2">Guardar</button>
+              </div>
+            )}
+
+            {adminTab==='pedidos' && (
+              <div>
+                <h3 className="font-bold mb-2">Pedidos</h3>
+                {listaPedidos.length===0 && <p className="text-gray-400 text-sm">Todavía no hay pedidos.</p>}
+                {listaPedidos.map(ped => {
+                  const pagado = pagadoDe(ped);
+                  const debe = debeDe(ped);
+                  const pagosArr = Object.entries(ped.pagos||{}).map(([id,pg])=>({id,...pg})).sort((a,b)=>a.fecha-b.fecha);
+                  return (
+                    <div key={ped.id} className="border rounded p-3 mb-3">
+                      <p className="font-semibold text-sm">{ped.nombre} - {ped.telefono}</p>
+                      <p className="text-xs text-gray-500">Zona: {ped.zona} | Evento: {ped.fecha}</p>
+                      <div className="my-2">
+                        {(ped.items||[]).map((it,idx)=>(
+                          <p key={idx} className="text-xs text-gray-600">{it.unidades}x {it.nombre} (pack {it.cantidadPack} - ${it.precioPack})</p>
+                        ))}
+                      </div>
+                      <p className="font-bold text-pink-600">Total: ${ped.total}</p>
+                      <p className="text-xs text-green-600">Cobrado: ${pagado}</p>
+                      <p className={`text-xs font-bold ${debe>0 ? 'text-red-500' : 'text-green-600'}`}>{debe>0 ? `Debe: $${debe}` : 'Saldado ✓'}</p>
+
+                      {pagosArr.length>0 && (
+                        <div className="mt-2 space-y-1">
+                          {pagosArr.map(pg=>(
+                            <div key={pg.id} className="flex justify-between items-center text-xs bg-gray-50 rounded px-2 py-1">
+                              <span>{fechaCorta(pg.fecha)} — ${pg.monto}</span>
+                              <button onClick={()=>generarRecibo(ped,pg)} className="text-blue-500">🧾 Recibo</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {debe>0 && (
+                        <div className="flex gap-2 mt-2">
+                          <input value={montoPagoInputs[ped.id]||''} onChange={e=>setMontoPagoInputs(prev=>({...prev,[ped.id]:e.target.value}))} type="number" placeholder="Monto pagado" className="border rounded p-2 flex-1 text-sm"/>
+                          <button onClick={()=>registrarPago(ped)} className="bg-green-500 text-white px-3 rounded text-sm">Registrar pago</button>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 flex-wrap mt-3">
+                        {ESTADOS.map(e=>(
+                          <button key={e.key} onClick={()=>cambiarEstadoPedido(ped.id, e.key)}
+                            className={`px-3 py-1 rounded-full text-xs text-white ${ped.estado===e.key ? e.color : 'bg-gray-300'}`}>
+                            {e.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {adminTab==='presupuestos' && (
+              <div>
+                <h3 className="font-bold mb-2">Presupuesto para clienta</h3>
+
+                <select onChange={e=>elegirClienteExistente(e.target.value)} className="border rounded w-full p-2 mb-2">
+                  <option value="">-- Elegir clienta guardada --</option>
+                  {listaClientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+                <input value={presClienteNombre} onChange={e=>setPresClienteNombre(e.target.value)} placeholder="Nombre de la clienta" className="border rounded w-full p-2 mb-2"/>
+                <input value={presClienteTelefono} onChange={e=>setPresClienteTelefono(e.target.value)} placeholder="Teléfono (opcional)" className="border rounded w-full p-2 mb-2"/>
+                <button onClick={guardarClienteNuevo} className="text-sm text-pink-600 mb-4">+ Guardar como clienta nueva</button>
+
+                <h4 className="font-bold text-sm mb-2">Agregar producto del catálogo</h4>
+                <select value={presProductoId} onChange={e=>{setPresProductoId(e.target.value); setPresVarianteIdx(0);}} className="border rounded w-full p-2 mb-2">
+                  <option value="">Elegir producto</option>
+                  {listaProductos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+                {presProductoId && (
+                  <select value={presVarianteIdx} onChange={e=>setPresVarianteIdx(Number(e.target.value))} className="border rounded w-full p-2 mb-2">
+                    {variantesDe(productos[presProductoId]).map((v,idx)=>(
+                      <option key={idx} value={idx}>{v.cantidad} unidad(es) — ${v.precio}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="flex gap-2 mb-4">
+                  <input value={presCantidad} onChange={e=>setPresCantidad(e.target.value)} type="number" placeholder="Cantidad de packs" className="border rounded p-2 flex-1"/>
+                  <button onClick={agregarItemPresupuesto} className="bg-pink-500 text-white px-4 rounded">Agregar</button>
+                </div>
+
+                <h4 className="font-bold text-sm mb-2">O agregar un ítem libre (no del catálogo)</h4>
+                <div className="flex gap-2 mb-4">
+                  <input value={presOtroNombre} onChange={e=>setPresOtroNombre(e.target.value)} placeholder="Descripción" className="border rounded p-2 flex-1"/>
+                  <input value={presOtroPrecio} onChange={e=>setPresOtroPrecio(e.target.value)} type="number" placeholder="Precio" className="border rounded p-2 w-24"/>
+                  <button onClick={agregarItemLibre} className="bg-pink-500 text-white px-3 rounded">+</button>
+                </div>
+
+                <h4 className="font-bold text-sm mb-2">Ítems del presupuesto</h4>
+                {presItems.length===0 && <p className="text-gray-400 text-sm mb-2">Todavía no agregaste productos.</p>}
+                {presItems.map((it,idx)=>(
+                  <div key={idx} className="flex justify-between items-center border-b py-2 text-sm">
+                    <span>{it.cantidad}x {it.nombre} — ${it.cantidad*it.precio}</span>
+                    <button onClick={()=>quitarItemPresupuesto(idx)} className="text-red-500">🗑</button>
+                  </div>
+                ))}
+                <p className="font-bold text-lg text-right my-3">Total: ${totalPresupuesto}</p>
+
+                <button onClick={generarPresupuestoPDF} className="w-full bg-pink-500 text-white py-3 rounded-full font-bold shadow-md hover:shadow-lg transition-all">
+                  📄 Generar PDF del presupuesto
+                </button>
+                <p className="text-xs text-gray-400 mt-2 text-center">Se descarga el PDF; después lo adjuntás vos en el chat de WhatsApp.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
