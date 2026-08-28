@@ -15,6 +15,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
 
+<!-- Librería Oficial de Íconos (Font Awesome) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -50,6 +53,30 @@
   h1, h2, h3, .font-heading { font-family: 'Fredoka', sans-serif; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  /* Estilos para los botones de redes sociales en el pie de página */
+  .btn-red {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 20px;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .btn-red:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .btn-whatsapp {
+    background-color: #25D366;
+  }
+  .btn-instagram {
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+  }
 </style>
 </head>
 <body class="bg-gradient-to-b from-pink-50/50 via-white to-pink-50/30 min-h-screen text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-700">
@@ -548,13 +575,13 @@ function App(){
             {config.whatsapp && (
               <a href={"https://wa.me/"+config.whatsapp} target="_blank"
                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition">
-                <span>💬</span> WhatsApp
+                <i className="fa-brands fa-whatsapp text-sm"></i> WhatsApp
               </a>
             )}
             {config.instagram && (
               <a href={"https://instagram.com/"+config.instagram} target="_blank"
                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200 text-xs font-semibold hover:bg-purple-100 transition">
-                <span>📷</span> Instagram
+                <i className="fa-brands fa-instagram text-sm"></i> Instagram
               </a>
             )}
             
@@ -787,7 +814,7 @@ function App(){
                     </div>
 
                     <button onClick={enviarPedido} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-2xl font-bold shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-2">
-                      <span>💬</span> Confirmar por WhatsApp
+                      <i className="fa-brands fa-whatsapp text-lg"></i> Confirmar por WhatsApp
                     </button>
                   </div>
                 )}
@@ -845,7 +872,7 @@ function App(){
               {pubItems.length>0 && config.whatsapp && (
                 <button onClick={enviarPresupuestoPublicoWhatsapp}
                   className="w-full bg-emerald-500 text-white py-3 rounded-2xl text-xs font-bold shadow-md hover:bg-emerald-600 transition flex items-center justify-center gap-2">
-                  <span>💬</span> Consultar este presupuesto por WhatsApp
+                  <i className="fa-brands fa-whatsapp text-base"></i> Consultar este presupuesto por WhatsApp
                 </button>
               )}
 
@@ -1171,6 +1198,34 @@ function App(){
           </div>
         </div>
       )}
+
+      {/* PIE DE PÁGINA (Footer con botones de Redes Sociales) */}
+      <footer className="mt-auto bg-white border-t border-pink-100 py-6 text-center">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¡Escribinos directamente!</p>
+        <div className="flex justify-center items-center gap-4">
+          {config.whatsapp && (
+            <a 
+              href={"https://wa.me/" + config.whatsapp + "?text=Hola,%20quisiera%20más%20información"} 
+              target="_blank" 
+              className="btn-red btn-whatsapp" 
+              aria-label="WhatsApp"
+              title="Enviar mensaje de WhatsApp">
+              <i className="fa-brands fa-whatsapp"></i>
+            </a>
+          )}
+
+          {config.instagram && (
+            <a 
+              href={"https://ig.me/m/" + config.instagram} 
+              target="_blank" 
+              className="btn-red btn-instagram" 
+              aria-label="Instagram"
+              title="Enviar mensaje por Instagram">
+              <i className="fa-brands fa-instagram"></i>
+            </a>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }
