@@ -1,0 +1,69 @@
+{
+  "rules": {
+    "productos": {
+      ".read": true,
+      ".write": true,
+      "$id": {
+        ".validate": "newData.hasChildren(['nombre']) && newData.child('nombre').isString() && newData.child('nombre').val().length <= 120",
+        "miniatura": {
+          ".validate": "newData.isString() && newData.val().length <= 150000"
+        }
+      }
+    },
+    "categorias": {
+      ".read": true,
+      ".write": true
+    },
+    "config": {
+      ".read": true,
+      ".write": true
+    },
+    "chatbot": {
+      ".read": true,
+      ".write": true
+    },
+    "pedidos": {
+      ".read": true,
+      ".write": true,
+      "$id": {
+        ".validate": "newData.hasChildren(['nombre', 'telefono', 'total', 'items'])",
+        "nombre": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "telefono": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "zona": {
+          ".validate": "newData.isString() && newData.val().length <= 120"
+        },
+        "fecha": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "total": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "estado": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        }
+      }
+    },
+    "clientes": {
+      ".read": true,
+      ".write": true,
+      "$id": {
+        "nombre": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "telefono": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        }
+      }
+    },
+    "fotos": {
+      "$id": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}
