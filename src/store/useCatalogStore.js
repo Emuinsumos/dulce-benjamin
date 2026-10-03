@@ -13,6 +13,7 @@ export const useCatalogStore = create((set) => ({
   listoCategorias: false,
   chatbotSaludo: SALUDO_BOT_DEFECTO,
   chatbotPreguntas: {},
+  festivos: {},
   listoConfig: false,
   listoChatbot: false,
   error: null,
@@ -24,6 +25,7 @@ export const useCatalogStore = create((set) => ({
     db.ref('productos').on('value', s => set({ productos: s.val() || {}, listoProductos: true }), fallo);
     db.ref('categorias').on('value', s => set({ categorias: s.val() || [], listoCategorias: true }), fallo);
     db.ref('config').on('value', s => set({ config: s.val() || { whatsapp: '', instagram: '', logo: '' }, listoConfig: true }), fallo);
+    db.ref('festivos').on('value', snap => set({ festivos: snap.val() || {} }), () => {});
     db.ref('chatbot').on('value', snap => {
       const v = snap.val() || {};
       set({ chatbotSaludo: v.saludo || SALUDO_BOT_DEFECTO, chatbotPreguntas: v.preguntas || {}, listoChatbot: true });

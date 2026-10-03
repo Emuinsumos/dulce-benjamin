@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 
-const CategoryBar = forwardRef(function CategoryBar({ categorias, total, activa, onElegir, top }, ref){
+const CategoryBar = forwardRef(function CategoryBar({ categorias, total, activa, onElegir, top, emojis = {} }, ref){
   const items = [{ nombre: 'Todos', cantidad: total }, ...categorias];
   return (
     <nav ref={ref} aria-label="Categorías" className="sticky z-20 w-full bg-white/95 backdrop-blur-md border-b border-pink-100 mb-2" style={{ top }}>
@@ -13,7 +13,7 @@ const CategoryBar = forwardRef(function CategoryBar({ categorias, total, activa,
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30'
                   : 'bg-white text-slate-700 border border-slate-200 hover:border-pink-300 hover:bg-pink-50/60'
               }`}>
-              {c.nombre} <span className="opacity-70 font-medium">{c.cantidad}</span>
+              {emojis[c.nombre] ? emojis[c.nombre] + ' ' : ''}{c.nombre} <span className="opacity-70 font-medium">{c.cantidad}</span>
             </button>
           ))}
         </div>

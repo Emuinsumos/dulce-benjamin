@@ -9,3 +9,5 @@ export const eliminarProducto = id => db.ref('productos/' + id).remove();
 export const reemplazarProductos = obj => db.ref('productos').set(obj);
 export const guardarCategorias = arr => db.ref('categorias').set(arr);
 export const guardarConfig = cfg => db.ref('config').set(cfg);
+export const guardarFestivo = (clave, data) => db.ref('festivos/' + clave).set(data);
+export const quitarFestivo = clave => db.ref('festivos/' + clave).remove();

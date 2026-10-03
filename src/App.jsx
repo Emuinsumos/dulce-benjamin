@@ -9,6 +9,9 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import Hero from './components/home/Hero';
 import Testimonials from './components/home/Testimonials';
+import FestivoBanner from './components/festivos/FestivoBanner';
+import FestivoMarco from './components/festivos/FestivoMarco';
+import { useFestivos } from './hooks/useFestivos';
 import SearchBox from './components/catalog/SearchBox';
 import CategoryTiles from './components/catalog/CategoryTiles';
 import CategoryBar from './components/catalog/CategoryBar';
@@ -25,6 +28,7 @@ const AdminPanel = lazy(() => import('./components/admin/AdminPanel'));
 export default function App(){
   const { productos, mapa, infoCategorias, cargando, error } = useProducts();
   const abrirProducto = useUiStore(s => s.abrirProducto);
+  const { emojis: emojisFestivos } = useFestivos();
   const loggedIn = useAdminStore(s => s.loggedIn);
   const mostrarLogin = useAdminStore(s => s.mostrarLogin);
   const mostrarAdmin = useAdminStore(s => s.mostrarAdmin);
@@ -62,20 +66,23 @@ export default function App(){
       <Toaster position="top-center" toastOptions={{ duration: 2200, style: { fontSize: '13px', fontWeight: 600, color: '#1e293b' } }} />
       <Header ref={headerRef} />
       <Hero onVerProductos={irACatalogo} />
+      <FestivoBanner onVerCategoria={elegirCategoria} />
       <SearchBox busqueda={busqueda} onChange={setBusqueda} sugCategorias={sugCategorias} sugProductos={sugProductos}
         onElegirCategoria={elegirCategoria} onElegirProducto={p => { abrirProducto(p); setBusqueda(''); }} />
       <CategoryTiles categorias={infoCategorias} onElegir={elegirCategoria} activo={categoria === 'Todos' && !busqueda && !cargando} />
 
       <div className="flex-1 flex flex-col">
-        <CategoryBar ref={pillsRef} top={headerH} categorias={infoCategorias} total={productos.length} activa={categoria}
+        <CategoryBar ref={pillsRef} top={headerH} emojis={emojisFestivos} categorias={infoCategorias} total={productos.length} activa={categoria}
           onElegir={c => { setCategoria(c); irACatalogo(); }} />
         <main id="catalogo" className="max-w-7xl mx-auto px-4 py-4 flex-1 w-full">
-          <ProductGrid productos={filtrados} cargando={cargando} error={error} />
+          <FestivoMarco categoria={categoria}>
+            <ProductGrid productos={filtrados} cargando={cargando} error={error} />
+          </FestivoMarco>
         </main>
       </div>
 
       <Testimonials />
-      <Footer />
+      <Footer onVerCategoria={elegirCategoria} />
       <ProductModal />
       <Suspense fallback={null}>
         <CartDrawer />

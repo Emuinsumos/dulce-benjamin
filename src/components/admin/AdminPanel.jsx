@@ -5,6 +5,9 @@ import { confirmar } from '../../lib/confirm';
 import { resizeImagen, miniaturaDesdeDataUrl } from '../../lib/image';
 import { guardarFotos, obtenerFotos, borrarFotos } from '../../services/photosService';
 import { useProducts } from '../../hooks/useProducts';
+import { useCatalogStore } from '../../store/useCatalogStore';
+import { guardarFestivo, quitarFestivo } from '../../services/productsService';
+import { TEMAS, slugCategoria } from '../../lib/festivos';
 import { useConfig } from '../../hooks/useConfig';
 import { useOrders } from '../../hooks/useOrders';
 import { useChatbot } from '../../hooks/useChatbot';
@@ -13,6 +16,7 @@ import { useAdminStore } from '../../store/useAdminStore';
 import { NOMBRE_NEGOCIO, imagenesDe, variantesDe, pagadoDe, debeDe, fechaCorta } from '../../lib/productUtils';
 
 export default function AdminPanel(){
+  const festivos = useCatalogStore(s => s.festivos);
   const { chatbotSaludo, chatbotPreguntas, chatbotListo, listaPreguntasBot, preguntasBotMostradas } = useChatbot();
   // --- Estado global (fase 2): carrito, sesión admin, UI y datos vienen de stores/hooks ---
   const { productos: listaProductos, mapa: productos, categorias } = useProducts();
@@ -495,15 +499,42 @@ export default function AdminPanel(){
                     <button onClick={agregarCategoria} className="bg-brand-500 text-white px-4 rounded-xl text-xs font-bold hover:bg-brand-600">Agregar</button>
                   </div>
                   <div className="space-y-1.5">
-                    <p className="text-[11px] text-slate-400">Usá ▲▼ para ordenar: es el orden en que las ve el cliente (las categorías sin productos no se muestran).</p>
-                    {categorias.map((c, i) => (
-                      <div key={c} className="flex justify-between items-center gap-2 border border-slate-100 p-2.5 rounded-xl text-xs">
-                        <span className="text-slate-700 font-medium flex-1 min-w-0 truncate">{c}</span>
-                        <button onClick={()=>moverCategoria(c,-1)} disabled={i===0} className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 disabled:opacity-30">▲</button>
-                        <button onClick={()=>moverCategoria(c,1)} disabled={i===categorias.length-1} className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 disabled:opacity-30">▼</button>
-                        <button onClick={()=>eliminarCategoria(c)} className="text-rose-500 font-semibold">Borrar</button>
-                      </div>
-                    ))}
+                    <p className="text-[11px] text-slate-600">Usá ▲▼ para ordenar: es el orden en que las ve el cliente (las categorías sin productos no se muestran). Tildá "Día festivo" para mostrarla como edición especial con banner y marco.</p>
+                    {categorias.map((c, i) => {
+                      const clave = slugCategoria(c);
+                      const fest = festivos[clave];
+                      return (
+                        <div key={c} className="border border-slate-100 p-2.5 rounded-xl text-xs space-y-2">
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="text-slate-700 font-medium flex-1 min-w-0 truncate">{c}</span>
+                            <button onClick={()=>moverCategoria(c,-1)} disabled={i===0} className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 disabled:opacity-30">▲</button>
+                            <button onClick={()=>moverCategoria(c,1)} disabled={i===categorias.length-1} className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 disabled:opacity-30">▼</button>
+                            <button onClick={()=>eliminarCategoria(c)} className="text-rose-500 font-semibold">Borrar</button>
+                          </div>
+                          <label className="flex items-center gap-2 text-slate-700 font-medium cursor-pointer">
+                            <input type="checkbox" checked={!!fest}
+                              onChange={e => e.target.checked
+                                ? guardarFestivo(clave, { categoria: c, tema: 'generico', hasta: '' }).then(() => toast.success('Marcada como día festivo: elegí el estilo'))
+                                : quitarFestivo(clave).then(() => toast.success('Ya no es día festivo'))} />
+                            🎉 Día festivo (banner + marco)
+                          </label>
+                          {fest && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="text-[11px] text-slate-600 font-semibold">Estilo
+                                <select value={fest.tema} onChange={e => guardarFestivo(clave, { ...fest, tema: e.target.value })}
+                                  className="mt-1 w-full border border-slate-200 rounded-lg p-2 text-xs bg-white text-slate-800">
+                                  {Object.entries(TEMAS).map(([k, t]) => <option key={k} value={k}>{t.emoji} {t.nombre}</option>)}
+                                </select>
+                              </label>
+                              <label className="text-[11px] text-slate-600 font-semibold">Mostrar hasta (opcional)
+                                <input type="date" value={fest.hasta || ''} onChange={e => guardarFestivo(clave, { ...fest, hasta: e.target.value })}
+                                  className="mt-1 w-full border border-slate-200 rounded-lg p-2 text-xs bg-white text-slate-800" />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
