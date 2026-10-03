@@ -64,6 +64,22 @@
         ".read": true,
         ".write": true
       }
+    },
+    "festivos": {
+      ".read": true,
+      ".write": true,
+      "$id": {
+        ".validate": "newData.hasChildren(['categoria','tema'])",
+        "categoria": {
+          ".validate": "newData.isString() && newData.val().length <= 80"
+        },
+        "tema": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        },
+        "hasta": {
+          ".validate": "newData.isString() && newData.val().length <= 10"
+        }
+      }
     }
   }
 }

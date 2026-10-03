@@ -5,8 +5,8 @@ export default {
     extend: {
       fontFamily: { sans: ['Quicksand', 'sans-serif'], heading: ['Fredoka', 'sans-serif'] },
       colors: { brand: { 50: '#FDF2F7', 100: '#FCE7F3', 500: '#EC4899', 600: '#DB2777', 700: '#BE185D' } },
-      keyframes: { fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } } },
-      animation: { 'fade-in': 'fadeIn 0.6s ease-out forwards' },
+      keyframes: { fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }, float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } } },
+      animation: { 'fade-in': 'fadeIn 0.6s ease-out forwards', float: 'float 4s ease-in-out infinite' },
     },
   },
   plugins: [],
